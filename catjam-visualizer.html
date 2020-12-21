@@ -104,6 +104,19 @@
                 ctx.lineTo(space*i,floor-(value+1)); //x,y
                 ctx.stroke();
             });
+
+            let changegraph = graph.map((value, i) => {
+                return i > 0 ? (graph[i-1] - value) : 0;
+            });
+
+            changegraph.forEach((value, i) => {
+                ctx.beginPath();
+                ctx.lineWidth = 1;
+                ctx.strokeStyle = 'gray';
+                ctx.moveTo(space*i,(floor-125)); //x,y
+                ctx.lineTo(space*i,(floor-125)+(value*30)); //x,y
+                ctx.stroke();
+            });
         }
 
         function calculateRMS(data) {
