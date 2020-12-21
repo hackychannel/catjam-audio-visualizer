@@ -48,6 +48,10 @@
         let dataLowpass = new Uint8Array(analyserLowpass.frequencyBinCount);
         let dataBP = new Uint8Array(analyserBP.frequencyBinCount);
         let dataHP = new Uint8Array(analyserHP.frequencyBinCount);
+        let graphSRC = Array(1000).fill(0);
+        let graphLP = Array(1000).fill(0);
+        let graphBP = Array(1000).fill(0);
+        let graphHP = Array(1000).fill(0);
         requestAnimationFrame(loopingFunction);
 
         function loopingFunction(){
@@ -60,31 +64,62 @@
         }
 
         function draw(data, dataLowpass, dataBP, dataHP){
-            const FLOOR_SOURCE = 300;
-            const FLOOR_LOWPASS = 600;
-            const FLOOR_BANDPASS = 900;
-            const FLOOR_HIGHPASS = 1200;
+            const FLOOR_SOURCE = 250;
+            const FLOOR_LOWPASS = 500;
+            const FLOOR_BANDPASS = 750;
+            const FLOOR_HIGHPASS = 1000;
 
             ctx.clearRect(0,0,canvas.width,canvas.height);
             ctx.font = '30px sans-serif';
             ctx.fillText(Date.now(), 150, 40);
+            ctx.font = '16px sans-serif';
+            ctx.fillText('Source', 250, FLOOR_SOURCE-200);
+            ctx.fillText('Lowpass filter', 250, FLOOR_LOWPASS-200);
+            ctx.fillText('Bandpass filter', 250, FLOOR_BANDPASS-200);
+            ctx.fillText('Highpass filter', 250, FLOOR_HIGHPASS-200);
             
             drawGraph(data, FLOOR_SOURCE, 'orange');
             drawGraph(dataLowpass, FLOOR_LOWPASS, 'green');
             drawGraph(dataBP, FLOOR_BANDPASS, 'purple');
             drawGraph(dataHP, FLOOR_HIGHPASS, 'magenta');
+
+            drawWave(data, graphSRC, FLOOR_SOURCE);
+            drawWave(dataLowpass, graphLP, FLOOR_LOWPASS);
+            drawWave(dataBP, graphBP, FLOOR_BANDPASS);
+            drawWave(dataHP, graphHP, FLOOR_HIGHPASS);
+        }
+
+        function drawWave(data, graph, floor) {
+            data = [...data];
+            let space = canvas.width / data.length;
+
+            let valueRMS = calculateRMS(data);
+            graph.push(valueRMS);
+            graph.shift();
+            graph.forEach((value, i) => {
+                ctx.beginPath();
+                ctx.lineWidth = 1;
+                ctx.strokeStyle = 'blue';
+                ctx.moveTo(space*i,floor-(value-1)); //x,y
+                ctx.lineTo(space*i,floor-(value+1)); //x,y
+                ctx.stroke();
+            });
+        }
+
+        function calculateRMS(data) {
+            let valueSumSquared = data.reduce((acc, value) => {
+                return acc + (value * value);
+            }, 0);
+            return Math.sqrt(valueSumSquared / data.length);
         }
 
         function drawGraph(data, floor, color) {
             data = [...data];
             let space = canvas.width / data.length;
 
-            let valueSumSquared = data.reduce((acc, value) => {
-                return acc + (value * value);
-            }, 0);
-            let valueRMS = Math.sqrt(valueSumSquared / data.length);
+            let valueRMS = calculateRMS(data);
             ctx.beginPath();
-            ctx.lineWidth = 3;
+            ctx.lineWidth = 1;
             ctx.strokeStyle = 'blue';
             ctx.moveTo(0,floor-valueRMS);
             ctx.lineTo(canvas.width,floor-valueRMS);
@@ -95,7 +130,7 @@
             }, 0);
             let valueMean = valueSum / data.length;
             ctx.beginPath();
-            ctx.lineWidth = 3;
+            ctx.lineWidth = 1;
             ctx.strokeStyle = 'cyan';
             ctx.moveTo(0,floor-valueMean);
             ctx.lineTo(canvas.width,floor-valueMean);
@@ -105,6 +140,7 @@
                 return Math.max(value, acc);
             }, 0);
             ctx.beginPath();
+            ctx.lineWidth = 1;
             ctx.strokeStyle = 'red';
             ctx.moveTo(0,floor-valueMax);
             ctx.lineTo(canvas.width,floor-valueMax);
