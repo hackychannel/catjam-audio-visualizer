@@ -1,5 +1,7 @@
 # catjam-audio-visualizer
-An audio visualizer for a web audio stream, that is a cat nodding its head to the beat
+An audio visualizer for a web audio stream, that is a cat nodding its head to the beat]
+
+It's not actually catJAM yet. It'll get there. :D
 
 1. `npm install`
 2. `npm run start`, will startup audio proxy, and output the url:port (localhost/local IP address).
