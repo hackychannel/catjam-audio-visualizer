@@ -1,0 +1,12 @@
+{
+    "name": "catjam-visualizer",
+    "version": "1.0.0",
+    "type": "module",
+    "scripts": {
+        "start": "node rainwave-proxy.js"
+    },
+    "dependencies": {
+        "express": "^4.17.1",
+        "request": "^2.88.2"
+    }
+}

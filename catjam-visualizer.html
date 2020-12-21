@@ -1,0 +1,127 @@
+<html>
+    <head>
+        <title>catjam visualizer test</title>
+    </head>
+    <body>
+        audio control: <br>
+        <audio controls id="source" src="http://192.168.1.19:3000" crossorigin="anonymous"></audio><br>
+        source audio: <br>
+        <canvas id="audio_visual" height="1200" width="500"></canvas><br>
+    </body>
+    <script language="javascript">
+        let canvas = document.getElementById("audio_visual");
+        let ctx = canvas.getContext("2d");
+
+        let audioElement = document.getElementById("source");
+        let audioCtx = new AudioContext();
+        let analyser = audioCtx.createAnalyser();
+        analyser.fftSize = 2048;
+        let source = audioCtx.createMediaElementSource(audioElement);
+        source.connect(analyser);
+        source.connect(audioCtx.destination);
+
+        // low pass filter
+        var filter = audioCtx.createBiquadFilter();
+        filter.type = "lowpass";
+        let analyserLowpass = audioCtx.createAnalyser();
+        analyserLowpass.fftSize = 2048;
+        source.connect(filter);
+        filter.connect(analyserLowpass);
+
+        // band pass filter
+        var filterBP = audioCtx.createBiquadFilter();
+        filterBP.type = "bandpass";
+        let analyserBP = audioCtx.createAnalyser();
+        analyserBP.fftSize = 2048;
+        source.connect(filterBP);
+        filterBP.connect(analyserBP);
+
+        // high pass filter
+        var filterHP = audioCtx.createBiquadFilter();
+        filterHP.type = "highpass";
+        let analyserHP = audioCtx.createAnalyser();
+        analyserHP.fftSize = 2048;
+        source.connect(filterHP);
+        filterHP.connect(analyserHP);
+
+        let data = new Uint8Array(analyser.frequencyBinCount);
+        let dataLowpass = new Uint8Array(analyserLowpass.frequencyBinCount);
+        let dataBP = new Uint8Array(analyserBP.frequencyBinCount);
+        let dataHP = new Uint8Array(analyserHP.frequencyBinCount);
+        requestAnimationFrame(loopingFunction);
+
+        function loopingFunction(){
+            requestAnimationFrame(loopingFunction);
+            analyser.getByteFrequencyData(data);
+            analyserLowpass.getByteFrequencyData(dataLowpass);
+            analyserBP.getByteFrequencyData(dataBP)
+            analyserHP.getByteFrequencyData(dataHP)
+            draw(data, dataLowpass, dataBP, dataHP);
+        }
+
+        function draw(data, dataLowpass, dataBP, dataHP){
+            const FLOOR_SOURCE = 300;
+            const FLOOR_LOWPASS = 600;
+            const FLOOR_BANDPASS = 900;
+            const FLOOR_HIGHPASS = 1200;
+
+            ctx.clearRect(0,0,canvas.width,canvas.height);
+            ctx.font = '30px sans-serif';
+            ctx.fillText(Date.now(), 150, 40);
+            
+            drawGraph(data, FLOOR_SOURCE, 'orange');
+            drawGraph(dataLowpass, FLOOR_LOWPASS, 'green');
+            drawGraph(dataBP, FLOOR_BANDPASS, 'purple');
+            drawGraph(dataHP, FLOOR_HIGHPASS, 'magenta');
+        }
+
+        function drawGraph(data, floor, color) {
+            data = [...data];
+            let space = canvas.width / data.length;
+
+            let valueSumSquared = data.reduce((acc, value) => {
+                return acc + (value * value);
+            }, 0);
+            let valueRMS = Math.sqrt(valueSumSquared / data.length);
+            ctx.beginPath();
+            ctx.lineWidth = 3;
+            ctx.strokeStyle = 'blue';
+            ctx.moveTo(0,floor-valueRMS);
+            ctx.lineTo(canvas.width,floor-valueRMS);
+            ctx.stroke();
+
+            let valueSum = data.reduce((acc, value) => {
+                return acc + value;
+            }, 0);
+            let valueMean = valueSum / data.length;
+            ctx.beginPath();
+            ctx.lineWidth = 3;
+            ctx.strokeStyle = 'cyan';
+            ctx.moveTo(0,floor-valueMean);
+            ctx.lineTo(canvas.width,floor-valueMean);
+            ctx.stroke();
+
+            let valueMax = data.reduce((acc, value) => {
+                return Math.max(value, acc);
+            }, 0);
+            ctx.beginPath();
+            ctx.strokeStyle = 'red';
+            ctx.moveTo(0,floor-valueMax);
+            ctx.lineTo(canvas.width,floor-valueMax);
+            ctx.stroke();
+
+            data.forEach((value, i) => {
+                ctx.beginPath();
+                ctx.lineWidth = 1;
+                ctx.strokeStyle = color;
+                ctx.moveTo(space*i,floor); //x,y
+                ctx.lineTo(space*i,floor-value); //x,y
+                ctx.stroke();
+            });
+        }
+
+        audioElement.onplay = ()=>{
+            audioCtx.resume();
+        }
+    </script>
+</html>
