@@ -268,7 +268,7 @@ function drawVolGraph(data, graph, floor) {
 
     // find and draw peaks in vol graph
     const ANALYSIS_START = 0;
-    const FRAME_INTERVAL = 15;
+    const FRAME_INTERVAL = 25;
     const peaks = [];
     for (let i = ANALYSIS_START; i < (graph.length - FRAME_INTERVAL); i += FRAME_INTERVAL) {
         const max = { position: 0, volume: 0, drawTime: 0 };
@@ -320,10 +320,10 @@ function drawVolGraph(data, graph, floor) {
             if (group.tempo <= 0) {
                 continue;
             }
-            while (group.tempo < 80) {
+            while (group.tempo < 60) {
                 group.tempo *= 2;
             }
-            while (group.tempo > 205) {
+            while (group.tempo > 170) {
                 group.tempo /= 2;
             }
             group.tempo = Math.round(group.tempo);
