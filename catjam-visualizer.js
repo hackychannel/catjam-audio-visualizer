@@ -50,11 +50,20 @@ let graphTest = Array(1000).fill(0);
 let graphTdSRC = Array(1000).fill(0);
 let graphTdTest = Array(1000).fill(0);
 
+let graphVolSrc = Array(1000).fill(0)
 let graphVolTest = Array(1000).fill(0);
 
 const startTime = Date.now();
 let frameDrawTimes = Array(1000).fill(0);
 let catBeatState = Array(1000).fill(0);
+
+let tapBeat = 0;
+let tapBeatState = Array(1000).fill(0);
+
+let tapButton = document.getElementById("tap");
+tapButton.onclick = function() {
+    tapBeat = 1;
+}
 
 let dataTimeDomain = new Uint8Array(analyser.frequencyBinCount);
 let dataTimeDomainTest = new Uint8Array(analyserTest.frequencyBinCount);
@@ -100,6 +109,7 @@ function draw(data, dataTest, dataTimeDomain, dataTimeDomainTest){
     drawTimeDomainData(dataTimeDomain, FLOOR_SOURCE);
     drawTimeDomainData(dataTimeDomainTest, FLOOR_TEST);
 
+    //drawVolGraph(data, graphVolSrc, FLOOR_SOURCE)
     drawVolGraph(dataTest, graphVolTest, FLOOR_TEST)
 
     //drawWave(dataTest, graphTest, FLOOR_TEST);
@@ -180,6 +190,26 @@ function draw(data, dataTest, dataTimeDomain, dataTimeDomainTest){
             ctx.stroke();
         }
     });
+
+    tapBeatState.push(tapBeat);
+    tapBeatState.shift();
+    tapBeat = 0;
+    tapBeatState.forEach((beatState, i) => {
+        if (beatState) {
+            ctx.beginPath();
+            ctx.lineWidth = 1;
+            ctx.strokeStyle = 'green';
+            ctx.moveTo(i,240-25);
+            ctx.lineTo(i,240+25);
+            ctx.stroke();
+        }
+    });
+    const tapBeats = tapBeatState.reduce((acc, cur) => {
+        return acc + cur;
+    }, 0);
+    const tapBPM = tapBeats / ((now - frameDrawTimes[0]) / (1000*60));
+    ctx.font = '20px sans-serif';
+    ctx.fillText(`tap BPM: ${Math.round(tapBPM)}`, 650, 150);
 }
 
 function drawTimeDomainData(data, floor) {
@@ -238,7 +268,7 @@ function drawVolGraph(data, graph, floor) {
 
     // find and draw peaks in vol graph
     const ANALYSIS_START = 0;
-    const FRAME_INTERVAL = 20;
+    const FRAME_INTERVAL = 15;
     const peaks = [];
     for (let i = ANALYSIS_START; i < (graph.length - FRAME_INTERVAL); i += FRAME_INTERVAL) {
         const max = { position: 0, volume: 0, drawTime: 0 };
@@ -290,10 +320,10 @@ function drawVolGraph(data, graph, floor) {
             if (group.tempo <= 0) {
                 continue;
             }
-            while (group.tempo < 70) {
+            while (group.tempo < 80) {
                 group.tempo *= 2;
             }
-            while (group.tempo > 185) {
+            while (group.tempo > 205) {
                 group.tempo /= 2;
             }
             group.tempo = Math.round(group.tempo);
