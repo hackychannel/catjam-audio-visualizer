@@ -54,6 +54,7 @@ let graphVolTest = Array(1000).fill(0);
 
 const startTime = Date.now();
 let frameDrawTimes = Array(1000).fill(0);
+let catBeatState = Array(1000).fill(0);
 
 let dataTimeDomain = new Uint8Array(analyser.frequencyBinCount);
 let dataTimeDomainTest = new Uint8Array(analyserTest.frequencyBinCount);
@@ -65,6 +66,7 @@ let beatsPerMinute = 120;
 const FRAMES_PER_BEAT = NUM_FRAMES / BEATS_PER_CYCLE;
 let framesPerSecond = (FRAMES_PER_BEAT * beatsPerMinute) / 60;
 let msPerFrame = (1 / framesPerSecond) * 1000;
+const CAT_NOD_FRAMES = [5, 18, 30, 42, 57, 66, 78, 89, 102, 114, 127, 138, 151];
 
 let bpmHistory = Array(30).fill(0);
 
@@ -100,7 +102,7 @@ function draw(data, dataTest, dataTimeDomain, dataTimeDomainTest){
 
     drawVolGraph(dataTest, graphVolTest, FLOOR_TEST)
 
-    drawWave(dataTest, graphTest, FLOOR_TEST);
+    //drawWave(dataTest, graphTest, FLOOR_TEST);
 
     const now = Date.now();
     // calculate current bpm
@@ -142,6 +144,20 @@ function draw(data, dataTest, dataTimeDomain, dataTimeDomainTest){
     ctx.fillStyle = 'black';
     ctx.font = '30px sans-serif';
     ctx.fillText(`current BPM: ${beatsPerMinute}`, 650, 75);
+    ctx.font = '20px sans-serif';
+    ctx.fillText(`ms per frame: ${msPerFrame}`, 650, 100);
+    ctx.fillText(`frame counter: ${frameNum}`, 650, 125);
+
+    CAT2_POS_X = 550;
+    CAT2_POS_Y = 400;
+    CAT2_HEIGHT = 448;
+    CAT2_WIDTH = 448;
+    CAT2_MARGIN = 30;
+    ctx.fillStyle = 'rgb(0, 255, 0)';
+    ctx.fillRect(CAT2_POS_X - CAT2_MARGIN, CAT2_POS_Y - CAT2_MARGIN, CAT2_HEIGHT + (CAT2_MARGIN*2), CAT2_WIDTH + (CAT2_MARGIN*2));
+    ctx.drawImage(frames[frameNum], CAT2_POS_X, CAT2_POS_Y, CAT2_WIDTH, CAT2_HEIGHT);
+    ctx.fillStyle = 'black';
+
 
     frameDrawTimes.push(now);
     const earliestFrameTime = frameDrawTimes.shift();
@@ -150,6 +166,20 @@ function draw(data, dataTest, dataTimeDomain, dataTimeDomainTest){
         : 'calculating...';
     ctx.font = '30px sans-serif';
     ctx.fillText(`avg FPS: ${avgFPS}`, 650, 40);
+
+    newCatBeatState = (frameAdvancedAt == now && CAT_NOD_FRAMES.includes(frameNum)) ? 1 : 0;
+    catBeatState.push(newCatBeatState);
+    catBeatState.shift();
+    catBeatState.forEach((beatState, i) => {
+        if (beatState) {
+            ctx.beginPath();
+            ctx.lineWidth = 1;
+            ctx.strokeStyle = 'brown';
+            ctx.moveTo(i,200-25);
+            ctx.lineTo(i,200+25);
+            ctx.stroke();
+        }
+    });
 }
 
 function drawTimeDomainData(data, floor) {
@@ -183,6 +213,7 @@ function drawVolGraph(data, graph, floor) {
     let valueMax = calculateMax(data);
     graph.push(valueMax);
     graph.shift();
+    /*
     graph.forEach((value, i) => {
         ctx.beginPath();
         ctx.lineWidth = 1;
@@ -191,6 +222,19 @@ function drawVolGraph(data, graph, floor) {
         ctx.lineTo(space*i,floor-(value+1)); //x,y
         ctx.stroke();
     });
+    */
+    ctx.beginPath();
+    ctx.lineWidth = 1;
+    ctx.strokeStyle = 'red';
+    for(let i = 0; i < graph.length; i++) {
+        const value = graph[i];
+        if(i === 0) {
+            ctx.moveTo(space*i,floor-value);
+        } else {
+            ctx.lineTo(space*i,floor-value);
+        }
+    }
+    ctx.stroke();
 
     // find and draw peaks in vol graph
     const ANALYSIS_START = 0;
@@ -210,11 +254,16 @@ function drawVolGraph(data, graph, floor) {
         }
     }
     //console.log(JSON.stringify(peaks));
+    PEAKS_FILTER_PERCENT = 0.6;
     peaks.sort(function(a, b) {
-        return b.volume - a.volume;
+        if (a.volume == b.volume) {
+            return b.position - a.position;
+        } else {
+            return b.volume - a.volume;
+        }
     });
     peaks.forEach((peak, idx) => {
-        const col = idx > peaks.length * 0.5 ? 160 : 0;
+        const col = idx > peaks.length * PEAKS_FILTER_PERCENT ? 160 : 0;
         const i = peak.position;
         ctx.beginPath();
         ctx.lineWidth = 1;
@@ -223,7 +272,7 @@ function drawVolGraph(data, graph, floor) {
         ctx.lineTo(space*i,(floor-200)+25); //x,y
         ctx.stroke();
     });
-    filteredPeaks = peaks.splice(0, peaks.length * 0.6);
+    filteredPeaks = peaks.splice(0, peaks.length * PEAKS_FILTER_PERCENT);
 
     // get intervals from peaks
     const groups = [];
@@ -241,10 +290,10 @@ function drawVolGraph(data, graph, floor) {
             if (group.tempo <= 0) {
                 continue;
             }
-            while (group.tempo < 80) {
+            while (group.tempo < 70) {
                 group.tempo *= 2;
             }
-            while (group.tempo > 180) {
+            while (group.tempo > 185) {
                 group.tempo /= 2;
             }
             group.tempo = Math.round(group.tempo);
