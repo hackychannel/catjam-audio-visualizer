@@ -1,5 +1,7 @@
 let canvas = document.getElementById("audio_visual");
 let ctx = canvas.getContext("2d");
+
+// canvas
 const VISUALIZER_WIDTH = 500;
 const GRAPH_WIDTH = 1000;
 
@@ -19,6 +21,8 @@ for (let i = 0; i < NUM_FRAMES; i++) {
     frames[i] = image;
 }
 
+// load audio source into AudioContext
+
 let audioElement = document.getElementById("source");
 let audioCtx = new AudioContext();
 let analyser = audioCtx.createAnalyser();
@@ -28,46 +32,57 @@ source.connect(analyser);
 source.connect(audioCtx.destination);
 
 // low pass -> high pass filter 
+let filterLPFreq = 150;
+let filterLPQ = 1;
+let filterHPFreq = 100;
+let filterHPQ = 1;
+
 var filterLP = audioCtx.createBiquadFilter();
 filterLP.type = "lowpass";
-filterLP.frequency.value = 150;
-filterLP.Q.value = 1;
+filterLP.frequency.value = filterLPFreq;
+filterLP.Q.value = filterLPQ;
 var filterHP = audioCtx.createBiquadFilter();
 filterHP.type = "highpass";
-filterHP.frequency.value = 100;
-filterHP.Q.value = 1;
+filterHP.frequency.value = filterHPFreq;
+filterHP.Q.value = filterLPQ;
 let analyserTest = audioCtx.createAnalyser();
 analyserTest.fftSize = 2048;
 source.connect(filterLP);
 filterLP.connect(filterHP);
 filterHP.connect(analyserTest);
 
+// analyzer frequency arrays
 let data = new Uint8Array(analyser.frequencyBinCount);
 let dataTest = new Uint8Array(analyserTest.frequencyBinCount);
-let graphSRC = Array(1000).fill(0);
-let graphTest = Array(1000).fill(0);
-
-let graphTdSRC = Array(1000).fill(0);
-let graphTdTest = Array(1000).fill(0);
-
-let graphVolSrc = Array(1000).fill(0)
-let graphVolTest = Array(1000).fill(0);
-
-const startTime = Date.now();
-let frameDrawTimes = Array(1000).fill(0);
-let catBeatState = Array(1000).fill(0);
-
-let tapBeat = 0;
-let tapBeatState = Array(1000).fill(0);
-
-let tapButton = document.getElementById("tap");
-tapButton.onclick = function() {
-    tapBeat = 1;
-}
-
+// analyzer time domain arrays
 let dataTimeDomain = new Uint8Array(analyser.frequencyBinCount);
 let dataTimeDomainTest = new Uint8Array(analyserTest.frequencyBinCount);
 
+// graph data arrays
+let graphSRC = Array(1000).fill(0);
+let graphTest = Array(1000).fill(0);
+let graphTdSRC = Array(1000).fill(0);
+let graphTdTest = Array(1000).fill(0);
+let graphVolSrc = Array(1000).fill(0)
+let graphVolTest = Array(1000).fill(0);
+
+// frame draw times
+let frameDrawTimes = Array(1000).fill(0);
+
+// animation beat state array
+let catBeatState = Array(1000).fill(0);
+
+// user tap state array
+let tapBeat = 0;
+let tapLastTime = 0;
+let tapLastInstBpm = 0;
+let tapBeatState = Array(1000).fill(0);
+
+canvas.onclick = function() {
+    tapBeat = 1;
+}
+
+// animation
 let frameNum = 0;
 let frameAdvancedAt = 0;
 const BEATS_PER_CYCLE = 13
@@ -77,12 +92,93 @@ let framesPerSecond = (FRAMES_PER_BEAT * beatsPerMinute) / 60;
 let msPerFrame = (1 / framesPerSecond) * 1000;
 const CAT_NOD_FRAMES = [5, 18, 30, 42, 57, 66, 78, 89, 102, 114, 127, 138, 151];
 
-let bpmHistory = Array(30).fill(0);
+// bpm histogram
+const BPM_HISTORY_LENGTH = 60;
+let bpmHistory = Array(BPM_HISTORY_LENGTH).fill(0);
 
+// bpm analysis vars
+let bpm_max = 150;
+let bpm_min = 70;
+let bpm_analysis_start_frame = 0;
+let bpm_analysis_interval = 25;
+let bpm_peak_threshold = 0.7;
+// bpm settings button
+let bpmSettingsButton = document.getElementById("set_bpm_settings");
+bpmSettingsButton.onclick = function() {
+    const bpmMinField = document.getElementById("bpm_min");
+    if (bpmMinField && bpmMinField.value) {
+        bpm_min = bpmMinField.value;
+        console.log(`bpm_min -> ${bpm_min}`);
+    } else {
+        console.log('error setting bpm_min');
+    }
+    const bpmMaxField = document.getElementById("bpm_max");
+    if (bpmMaxField && bpmMaxField.value) {
+        bpm_max = bpmMaxField.value;
+        console.log(`bpm_max -> ${bpm_max}`);
+    } else {
+        console.log('error setting bpm_max');
+    }
+    const bpmPeakThresholdField = document.getElementById("bpm_peak_threshold");
+    if (bpmPeakThresholdField && bpmPeakThresholdField.value) {
+        bpm_peak_threshold = bpmPeakThresholdField.value;
+        console.log(`bpm_peak_threshold -> ${bpm_peak_threshold}`);
+    } else {
+        console.log('error setting bpm_peak_threshold');
+    }
+    /*
+    const bpmStartField = document.getElementById("bpm_analysis_start");
+    if (bpmStartField && bpmStartField.value) {
+        bpm_analysis_start_frame = bpmStartField.value;
+        console.log(`bpm_analysis_start_frame -> ${bpm_analysis_start_frame}`);
+    } else {
+        console.log('error setting bpm_analysis_start_frame');
+    }
+    const bpmIntField = document.getElementById("bpm_analysis_interval");
+    if (bpmIntField && bpmIntField.value) {
+        bpm_analysis_interval = bpmIntField.value;
+        console.log(`bpm_min -> ${bpm_min}`);
+    } else {
+        console.log('error setting bpm_min');
+    }
+    */
+};
+// filter settings button
+let filterSettingsButton = document.getElementById("set_filter_settings");
+filterSettingsButton.onclick = function() {
+    [
+        ['lp_freq', 'filterLPFreq'],
+        ['lp_q', 'filterLPQ'],
+        ['hp_freq', 'filterHPFreq'],
+        ['hp_q', 'filterHPQ'],
+    ].forEach((fields) => {
+        const [fieldName, varName] = fields;
+        const field = document.getElementById(fieldName);
+        if (field && field.value) {
+            window[varName] = field.value;
+            console.log(`${varName} -> ${window[varName]}`);
+        } else {
+            console.log(`error setting ${varName}`);
+        }
+    });
+    filterLP.frequency.value = filterLPFreq;
+    filterLP.Q.value = filterLPQ;
+    filterHP.frequency.value = filterHPFreq;
+    filterHP.Q.value = filterLPQ;
+};
+
+let useSourceAudioForAnalysis = false;
+let toggleAnalysisButton = document.getElementById("toggle_analysis");
+toggleAnalysisButton.onclick = function() {
+    useSourceAudioForAnalysis = !useSourceAudioForAnalysis;
+}
+
+// when all images are loaded, start animation
 function allLoaded() {
     requestAnimationFrame(loopingFunction);
 }
 
+// main data request -> draw loop
 function loopingFunction(){
     requestAnimationFrame(loopingFunction);
     analyser.getByteFrequencyData(data);
@@ -92,31 +188,43 @@ function loopingFunction(){
     draw(data, dataTest, dataTimeDomain, dataTimeDomainTest);
 }
 
+// canvas draw function
 function draw(data, dataTest, dataTimeDomain, dataTimeDomainTest){
-    const FLOOR_SOURCE = 250;
+    const FLOOR_SOURCE = 300;
     const FLOOR_TEST = 500;
 
+    // clear canvas
     ctx.clearRect(0,0,canvas.width,canvas.height);
+
+    // paint timestamp
     ctx.font = '30px sans-serif';
     ctx.fillText(Date.now(), 150, 40);
+
+    // paint graph labels
     ctx.font = '16px sans-serif';
     ctx.fillText('Source', 250, FLOOR_SOURCE-200);
     ctx.fillText('Lowpass + Highpass filter', 250, FLOOR_TEST-200);
     
+    // paint frequency graphs
     drawGraph(data, FLOOR_SOURCE, 'orange');
     drawGraph(dataTest, FLOOR_TEST, 'teal');
 
+    // paint waveform graphs
     drawTimeDomainData(dataTimeDomain, FLOOR_SOURCE);
     drawTimeDomainData(dataTimeDomainTest, FLOOR_TEST);
 
-    //drawVolGraph(data, graphVolSrc, FLOOR_SOURCE)
-    drawVolGraph(dataTest, graphVolTest, FLOOR_TEST)
+    // paint max volume graph (does bpm determination logic)
+    if (useSourceAudioForAnalysis) {
+        drawVolGraph(data, graphVolSrc, FLOOR_SOURCE);
+    } else {
+        drawVolGraph(dataTest, graphVolTest, FLOOR_TEST);
+    }
 
     //drawWave(dataTest, graphTest, FLOOR_TEST);
 
     const now = Date.now();
-    // calculate current bpm
-    //console.log(JSON.stringify(bpmHistory));
+    // calculate bpm to be at
+    // - use most frequent BPM result from the past 30 frames
     bpmHistogram = bpmHistory.reduce((acc, cur) => {
         if (!cur) {
             return acc;
@@ -128,7 +236,6 @@ function draw(data, dataTest, dataTimeDomain, dataTimeDomainTest){
         }
         return acc;
     }, {});
-    //console.log(JSON.stringify(bpmHistogram));
     if (Object.keys(bpmHistogram).length > 0) {
         ctx.fillStyle = 'black';
         ctx.font = '12px sans-serif';
@@ -140,10 +247,12 @@ function draw(data, dataTest, dataTimeDomain, dataTimeDomainTest){
     }
     // recalculate ms per frame from current bpm
     msPerFrame = (1 / ((FRAMES_PER_BEAT * beatsPerMinute) / 60)) * 1000;
+    // do we advance the animation frame this draw?
     if (now > frameAdvancedAt + msPerFrame) {
         frameNum = (frameNum + 1) % NUM_FRAMES;
         frameAdvancedAt = now;
     }
+    // draw cat 1
     CAT_POS_X = 520;
     CAT_POS_Y = 20;
     CAT_HEIGHT = 112;
@@ -151,6 +260,8 @@ function draw(data, dataTest, dataTimeDomain, dataTimeDomainTest){
     ctx.fillStyle = 'rgb(0, 255, 0)';
     ctx.fillRect(CAT_POS_X - 20, CAT_POS_Y - 20, CAT_WIDTH + 40, CAT_HEIGHT + 40);
     ctx.drawImage(frames[frameNum], CAT_POS_X, CAT_POS_Y);
+
+    // draw statistical data
     ctx.fillStyle = 'black';
     ctx.font = '30px sans-serif';
     ctx.fillText(`current BPM: ${beatsPerMinute}`, 650, 75);
@@ -158,6 +269,7 @@ function draw(data, dataTest, dataTimeDomain, dataTimeDomainTest){
     ctx.fillText(`ms per frame: ${msPerFrame}`, 650, 100);
     ctx.fillText(`frame counter: ${frameNum}`, 650, 125);
 
+    // draw cat 2
     CAT2_POS_X = 550;
     CAT2_POS_Y = 400;
     CAT2_HEIGHT = 448;
@@ -168,7 +280,7 @@ function draw(data, dataTest, dataTimeDomain, dataTimeDomainTest){
     ctx.drawImage(frames[frameNum], CAT2_POS_X, CAT2_POS_Y, CAT2_WIDTH, CAT2_HEIGHT);
     ctx.fillStyle = 'black';
 
-
+    // draw fps estimate
     frameDrawTimes.push(now);
     const earliestFrameTime = frameDrawTimes.shift();
     const avgFPS = earliestFrameTime > 0 
@@ -177,6 +289,7 @@ function draw(data, dataTest, dataTimeDomain, dataTimeDomainTest){
     ctx.font = '30px sans-serif';
     ctx.fillText(`avg FPS: ${avgFPS}`, 650, 40);
 
+    // draw cat nod beats
     newCatBeatState = (frameAdvancedAt == now && CAT_NOD_FRAMES.includes(frameNum)) ? 1 : 0;
     catBeatState.push(newCatBeatState);
     catBeatState.shift();
@@ -191,6 +304,13 @@ function draw(data, dataTest, dataTimeDomain, dataTimeDomainTest){
         }
     });
 
+    // draw user tap beats
+    if (tapBeat) {
+        if (tapLastTime) {
+            tapLastInstBpm = 1 / ((now - tapLastTime) / (1000*60));
+        }
+        tapLastTime = now;
+    }
     tapBeatState.push(tapBeat);
     tapBeatState.shift();
     tapBeat = 0;
@@ -209,9 +329,10 @@ function draw(data, dataTest, dataTimeDomain, dataTimeDomainTest){
     }, 0);
     const tapBPM = tapBeats / ((now - frameDrawTimes[0]) / (1000*60));
     ctx.font = '20px sans-serif';
-    ctx.fillText(`tap BPM: ${Math.round(tapBPM)}`, 650, 150);
+    ctx.fillText(`tap avg BPM: ${Math.round(tapBPM)}, instantaneous BPM: ${Math.round(tapLastInstBpm)}`, 650, 150);
 }
 
+// draws timedomain data into a waveform
 function drawTimeDomainData(data, floor) {
     const HEIGHT = 250;
     const WIDTH = 500
@@ -237,22 +358,16 @@ function drawTimeDomainData(data, floor) {
     ctx.stroke();
 }
 
+// calculates maximum volume of current data, appends to graph, draws graph
+// does BPM calculation based on graph data
 function drawVolGraph(data, graph, floor) {
     data = [...data];
     let space = 1;
+    // calculate volume of this frame of data, append to graph
     let valueMax = calculateMax(data);
     graph.push(valueMax);
     graph.shift();
-    /*
-    graph.forEach((value, i) => {
-        ctx.beginPath();
-        ctx.lineWidth = 1;
-        ctx.strokeStyle = 'red';
-        ctx.moveTo(space*i,floor-(value-1)); //x,y
-        ctx.lineTo(space*i,floor-(value+1)); //x,y
-        ctx.stroke();
-    });
-    */
+    // draw graph
     ctx.beginPath();
     ctx.lineWidth = 1;
     ctx.strokeStyle = 'red';
@@ -266,13 +381,33 @@ function drawVolGraph(data, graph, floor) {
     }
     ctx.stroke();
 
-    // find and draw peaks in vol graph
+    // get bpm analysis settings, draw next to graph
+    //const ANALYSIS_START = bpm_analysis_start_frame;
+    //const FRAME_INTERVAL = bpm_analysis_interval;
     const ANALYSIS_START = 0;
-    const FRAME_INTERVAL = 25;
+    const FRAME_INTERVAL = 15;
+    const INTERVAL_WIDTH = 45;
+    const TEMPO_MIN = bpm_min;
+    const TEMPO_MAX = bpm_max;
+    const PEAKS_FILTER_PERCENT = bpm_peak_threshold;
+    ctx.font = '16px sans-serif';
+    ctx.fillStyle = 'black';
+    ctx.fillText(`bpm_peak_threshold [${PEAKS_FILTER_PERCENT}]`, 1050, floor-220);
+    ctx.fillText(`bpm_min [${TEMPO_MIN}]`, 1050, floor-200);
+    ctx.fillText(`bpm_max [${TEMPO_MAX}]`, 1050, floor-180);
+    //ctx.fillText(`analysis_start_frame [${ANALYSIS_START}]`, 1050, floor-160);
+    //ctx.fillText(`frame_interval [${FRAME_INTERVAL}]`, 1050, floor-140);
+
+    // find and draw peaks in vol graph
+    // peaks calculation:
     const peaks = [];
     for (let i = ANALYSIS_START; i < (graph.length - FRAME_INTERVAL); i += FRAME_INTERVAL) {
         const max = { position: 0, volume: 0, drawTime: 0 };
-        for (var j = i; j < (i + FRAME_INTERVAL); j++) {
+        for (let j = i; j < i + INTERVAL_WIDTH; j++) {
+            //console.log(`i ${i}, j ${j}`);
+            if (!graph[j]) {
+                continue;
+            }
             if (max.position == 0 || Math.abs(graph[j]) > max.volume) {
                 max.position = j;
                 max.volume = graph[j];
@@ -283,8 +418,6 @@ function drawVolGraph(data, graph, floor) {
             peaks.push(max);
         }
     }
-    //console.log(JSON.stringify(peaks));
-    PEAKS_FILTER_PERCENT = 0.6;
     peaks.sort(function(a, b) {
         if (a.volume == b.volume) {
             return b.position - a.position;
@@ -312,6 +445,9 @@ function drawVolGraph(data, graph, floor) {
             if (!filteredPeaks[idx].drawTime || !filteredPeaks[idx].drawTime) {
                 continue;
             }
+            if (Math.abs(filteredPeaks[idx].drawTime - filteredPeaks[i].drawTime) == 0) {
+                continue;
+            }
             const tempo = 1 / (Math.abs(filteredPeaks[idx].drawTime - filteredPeaks[i].drawTime) / 1000000);
             const group = {
                 tempo,
@@ -320,10 +456,10 @@ function drawVolGraph(data, graph, floor) {
             if (group.tempo <= 0) {
                 continue;
             }
-            while (group.tempo < 60) {
+            while (group.tempo < TEMPO_MIN) {
                 group.tempo *= 2;
             }
-            while (group.tempo > 170) {
+            while (group.tempo > TEMPO_MAX) {
                 group.tempo /= 2;
             }
             group.tempo = Math.round(group.tempo);

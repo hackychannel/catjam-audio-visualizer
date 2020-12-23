@@ -3,10 +3,34 @@
         <title>catjam visualizer test</title>
     </head>
     <body>
-        audio control: <br>
-        <audio controls id="source" src="http://192.168.1.19:3000" crossorigin="anonymous"></audio><br>
-        <button id="tap">tap to the beat</button><br>
-        source audio: <br>
+        <table>
+            <tr>
+                <td>
+                    audio control: <br>
+                    <audio controls id="source" src="http://192.168.1.19:3000" crossorigin="anonymous"></audio><br>
+                    tap on canvas to the beat
+                </td>
+                <td>
+                    min BPM: <input id="bpm_min" value="70" style="width:70px"><br>
+                    max BPM: <input id="bpm_max" value="150" style="width:70px"><br>
+                    use top % of peaks: <input id="bpm_peak_threshold" value="0.7" style="width:70px"> (0.10-1.00)<br>
+                    <!--start bpm analysis at frame: <input id="bpm_analysis_start" value="0" style="width:70px"> (0-1000)<br>
+                    bpm analysis interval: <input id="bpm_analysis_interval" value="25" style="width:70px"> frames<br>-->
+                    <button id="set_bpm_settings">set bpm analysis settings</button>
+                </td>
+                <td>
+                    lowpass filter frequency: <input id="lp_freq" value="150" style="width:70px"><br>
+                    lowpass filter Q: <input id="lp_q" value="1" style="width:70px"><br>
+                    highpass filter frequency: <input id="hp_freq" value="100" style="width:70px"><br>
+                    highpass filter Q: <input id="hp_q" value="1" style="width:70px"><br>
+                    <button id="set_filter_settings">set filter settings</button>
+                </td>
+                <td>
+                    <button id="toggle_analysis">toggle analysis graph source</button>
+                </td>
+            </tr>
+        </table><br>
+        canvas: <br>
         <canvas id="audio_visual" height="1500" width="1500"></canvas><br>
     </body>
     <script language="javascript" src="catjam-visualizer.js"></script>
